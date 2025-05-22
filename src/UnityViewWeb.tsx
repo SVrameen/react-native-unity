@@ -1,10 +1,11 @@
-import React, { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
+import React, {
+  useEffect,
+  useRef,
+  forwardRef,
+  useImperativeHandle,
+} from 'react';
 import { View, StyleSheet } from 'react-native';
-import {
-  UnityWebGLContent,
-  UnityInstance,
-  UnityWebViewRef
-} from './types';
+import type { UnityWebGLContent, UnityWebViewRef, WebGLBuilder } from './types';
 
 interface UnityViewProps {
   unityContent: UnityWebGLContent;
@@ -20,39 +21,46 @@ declare global {
   interface Window {
     createUnityInstance: (
       canvas: HTMLCanvasElement,
-      config: UnityContentProps,
+      config: UnityWebGLContent,
       onProgress?: (progress: number) => void
     ) => Promise<WebGLBuilder>;
     unityInstance?: WebGLBuilder;
     ReactNativeWebView?: {
       postMessage: (message: string) => void;
     };
+    ReactNativeUnityPostMessage?: (event: MessageEvent | string) => void;
   }
 }
 
 const UnityViewWeb = forwardRef<UnityWebViewRef, UnityViewProps>(
-  ({ unityContent, style, onUnityMessage, onPlayerUnload, onPlayerQuit, fullScreen }, ref) => {
+  (props, ref) => {
+    const { unityContent, style, onUnityMessage, onPlayerUnload, fullScreen } =
+      props;
+
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
-    const containerRef = useRef<View | null>(null);
+    const containerRef = useRef<any>(null);
     const unityInstanceRef = useRef<WebGLBuilder | null>(null);
 
     // Setup Unity message handler
     useEffect(() => {
-      // Create global event listener for Unity to React Native communication
-      window.addEventListener('message', handleUnityMessage);
+      const handleUnityMessage = (event: MessageEvent | string) => {
+        if (!onUnityMessage) return;
+
+        if (typeof event === 'string') {
+          onUnityMessage(event);
+        } else if (typeof event.data === 'string') {
+          onUnityMessage(event.data);
+        }
+      };
+
+      window.addEventListener('message', handleUnityMessage as any);
       window.ReactNativeUnityPostMessage = handleUnityMessage;
 
       return () => {
-        window.removeEventListener('message', handleUnityMessage);
-        delete window.ReactNativeUnityPostMessage;
+        window.removeEventListener('message', handleUnityMessage as any);
+        window.ReactNativeUnityPostMessage = undefined;
       };
     }, [onUnityMessage]);
-
-    const handleUnityMessage = (event: MessageEvent) => {
-      if (typeof event.data === 'string' && onUnityMessage) {
-        onUnityMessage(event.data);
-      }
-    };
 
     // Setup Unity instance
     useEffect(() => {
@@ -105,48 +113,70 @@ const UnityViewWeb = forwardRef<UnityWebViewRef, UnityViewProps>(
 
         document.body.removeChild(script);
       };
-    }, [unityContent.loaderUrl]);
+    }, [unityContent.loaderUrl, fullScreen, onPlayerUnload, unityContent]);
 
     // Expose methods to parent component
-    useImperativeHandle(ref, () => ({
-      postMessage: (gameObject: string, methodName: string, message: string) => {
-        if (unityInstanceRef.current) {
-          unityInstanceRef.current.SendMessage(gameObject, methodName, message);
-        }
-      },
-      unloadUnity: () => {
-        if (unityInstanceRef.current) {
-          unityInstanceRef.current.Quit();
-          unityInstanceRef.current = null;
-          window.unityInstance = undefined;
-
-          if (onPlayerUnload) {
-            onPlayerUnload('Unity WebGL player unloaded');
+    useImperativeHandle(
+      ref,
+      () => ({
+        postMessage: (
+          gameObject: string,
+          methodName: string,
+          message: string
+        ) => {
+          if (unityInstanceRef.current) {
+            unityInstanceRef.current.SendMessage(
+              gameObject,
+              methodName,
+              message
+            );
           }
-        }
-      },
-      pauseUnity: (pause: boolean) => {
-        // WebGL builds don't have direct pause/resume, but we can use Time.timeScale
-        if (unityInstanceRef.current) {
-          const timeScale = pause ? 0 : 1;
-          unityInstanceRef.current.SendMessage('WebGLHandler', 'SetTimeScale', timeScale.toString());
-        }
-      },
-      resumeUnity: () => {
-        if (unityInstanceRef.current) {
-          unityInstanceRef.current.SendMessage('WebGLHandler', 'SetTimeScale', '1');
-        }
-      }
-    }));
+        },
+        unloadUnity: () => {
+          if (unityInstanceRef.current) {
+            unityInstanceRef.current.Quit();
+            unityInstanceRef.current = null;
+            window.unityInstance = undefined;
+
+            if (onPlayerUnload) {
+              onPlayerUnload('Unity WebGL player unloaded');
+            }
+          }
+        },
+        pauseUnity: (pause: boolean) => {
+          // WebGL builds don't have direct pause/resume, but we can use Time.timeScale
+          if (unityInstanceRef.current) {
+            const timeScale = pause ? 0 : 1;
+            unityInstanceRef.current.SendMessage(
+              'WebGLHandler',
+              'SetTimeScale',
+              timeScale.toString()
+            );
+          }
+        },
+        resumeUnity: () => {
+          if (unityInstanceRef.current) {
+            unityInstanceRef.current.SendMessage(
+              'WebGLHandler',
+              'SetTimeScale',
+              '1'
+            );
+          }
+        },
+      }),
+      [onPlayerUnload]
+    );
 
     return (
-      <View
-        ref={containerRef}
-        style={[styles.container, style]}
-      >
+      <View ref={containerRef} style={[styles.container, style]}>
         <canvas
           ref={canvasRef}
-          style={styles.canvas}
+          // @ts-ignore - React Native Web style type mismatch
+          // eslint-disable-next-line react-native/no-inline-styles
+          style={{
+            width: '100%',
+            height: '100%',
+          }}
         />
       </View>
     );
@@ -157,11 +187,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     overflow: 'hidden',
-  },
-  canvas: {
-    width: '100%',
-    height: '100%',
-    display: 'block',
   },
 });
 

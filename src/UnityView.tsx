@@ -7,7 +7,7 @@ import type { StyleProp, ViewStyle } from 'react-native';
 
 // Import WebGL specific implementation and types
 import UnityViewWeb from './UnityViewWeb';
-import type { UnityWebViewRef, UnityWebGLContent } from './types';
+import type { UnityWebGLContent } from './types';
 import { getDefaultWebGLContent } from './types';
 
 type UnityViewContentUpdateEvent = Readonly<{
@@ -25,8 +25,7 @@ type RNUnityViewProps = {
   webGLContent?: UnityWebGLContent;
 };
 
-// Force any type for component ref to handle both native and web
-type ComponentRef = any;
+// Using any for component ref to handle both native and web
 
 export default class UnityView extends React.Component<RNUnityViewProps> {
   ref = React.createRef<any>(); // Using any as we need to handle both native and web refs
@@ -96,33 +95,93 @@ export default class UnityView extends React.Component<RNUnityViewProps> {
   render() {
     // For web platform, use the WebGL implementation
     if (Platform.OS === 'web') {
-      const { webGLContent, onUnityMessage, onPlayerUnload, onPlayerQuit, fullScreen, style } = this.props;
+      const {
+        webGLContent,
+        onUnityMessage,
+        onPlayerUnload,
+        onPlayerQuit,
+        fullScreen,
+        style,
+      } = this.props;
 
       // Try to use provided webGLContent or auto-detect it
       const unityContent = webGLContent || getDefaultWebGLContent();
 
       if (!unityContent) {
-        console.warn('UnityView: webGLContent prop is required for web platform or place your WebGL build in /unity/builds/web/');
+        console.warn(
+          'UnityView: webGLContent prop is required for web platform or place your WebGL build in /unity/builds/web/'
+        );
         return null;
       }
 
       // Handle event conversion for web
       const handleUnityMessage = (message: string) => {
-        onUnityMessage?.({
-          nativeEvent: { message },
-        });
+        if (onUnityMessage) {
+          // Create a synthetic event that matches React Native's expected format
+          onUnityMessage({
+            nativeEvent: { message },
+            target: null,
+            currentTarget: null,
+            eventPhase: 0,
+            bubbles: false,
+            cancelable: false,
+            defaultPrevented: false,
+            isTrusted: true,
+            preventDefault: () => {},
+            isDefaultPrevented: () => false,
+            stopPropagation: () => {},
+            isPropagationStopped: () => false,
+            persist: () => {},
+            timeStamp: Date.now(),
+            type: '',
+          } as any);
+        }
       };
 
       const handlePlayerUnload = (message: string) => {
-        onPlayerUnload?.({
-          nativeEvent: { message },
-        });
+        if (onPlayerUnload) {
+          // Create a synthetic event that matches React Native's expected format
+          onPlayerUnload({
+            nativeEvent: { message },
+            target: null,
+            currentTarget: null,
+            eventPhase: 0,
+            bubbles: false,
+            cancelable: false,
+            defaultPrevented: false,
+            isTrusted: true,
+            preventDefault: () => {},
+            isDefaultPrevented: () => false,
+            stopPropagation: () => {},
+            isPropagationStopped: () => false,
+            persist: () => {},
+            timeStamp: Date.now(),
+            type: '',
+          } as any);
+        }
       };
 
       const handlePlayerQuit = (message: string) => {
-        onPlayerQuit?.({
-          nativeEvent: { message },
-        });
+        if (onPlayerQuit) {
+          // Create a synthetic event that matches React Native's expected format
+          onPlayerQuit({
+            nativeEvent: { message },
+            target: null,
+            currentTarget: null,
+            eventPhase: 0,
+            bubbles: false,
+            cancelable: false,
+            defaultPrevented: false,
+            isTrusted: true,
+            preventDefault: () => {},
+            isDefaultPrevented: () => false,
+            stopPropagation: () => {},
+            isPropagationStopped: () => false,
+            persist: () => {},
+            timeStamp: Date.now(),
+            type: '',
+          } as any);
+        }
       };
 
       return (

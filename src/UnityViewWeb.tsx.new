@@ -1,0 +1,194 @@
+import React, { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
+import { View, StyleSheet } from 'react-native';
+import type {
+  UnityWebGLContent,
+  UnityWebViewRef,
+  WebGLBuilder
+} from './types';
+
+interface UnityViewProps {
+  unityContent: UnityWebGLContent;
+  style?: any; // Using any for React Native Web compatibility
+  onUnityMessage?: (message: string) => void;
+  onPlayerUnload?: (message: string) => void;
+  onPlayerQuit?: (message: string) => void;
+  fullScreen?: boolean;
+}
+
+// This declares the Unity global object that will be available after Unity loads
+declare global {
+  interface Window {
+    createUnityInstance: (
+      canvas: HTMLCanvasElement,
+      config: UnityWebGLContent,
+      onProgress?: (progress: number) => void
+    ) => Promise<WebGLBuilder>;
+    unityInstance?: WebGLBuilder;
+    ReactNativeWebView?: {
+      postMessage: (message: string) => void;
+    };
+    ReactNativeUnityPostMessage?: (event: MessageEvent | string) => void;
+  }
+}
+
+const UnityViewWeb = forwardRef<UnityWebViewRef, UnityViewProps>((props, ref) => {
+  const {
+    unityContent,
+    style,
+    onUnityMessage,
+    onPlayerUnload,
+    fullScreen
+  } = props;
+
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const containerRef = useRef<any>(null);
+  const unityInstanceRef = useRef<WebGLBuilder | null>(null);
+
+  // Setup Unity message handler
+  useEffect(() => {
+    const handleUnityMessage = (event: MessageEvent | string) => {
+      if (!onUnityMessage) return;
+
+      if (typeof event === 'string') {
+        onUnityMessage(event);
+      } else if (typeof event.data === 'string') {
+        onUnityMessage(event.data);
+      }
+    };
+
+    window.addEventListener('message', handleUnityMessage as any);
+    window.ReactNativeUnityPostMessage = handleUnityMessage;
+
+    return () => {
+      window.removeEventListener('message', handleUnityMessage as any);
+      window.ReactNativeUnityPostMessage = undefined;
+    };
+  }, [onUnityMessage]);
+
+  // Setup Unity instance
+  useEffect(() => {
+    if (!canvasRef.current || !unityContent.loaderUrl) {
+      return;
+    }
+
+    const loadUnity = async () => {
+      try {
+        // Load and instantiate Unity
+        window.unityInstance = await window.createUnityInstance(
+          canvasRef.current as HTMLCanvasElement,
+          unityContent,
+          (progress: number) => {
+            console.log(`Loading Unity: ${Math.round(progress * 100)}%`);
+          }
+        );
+
+        unityInstanceRef.current = window.unityInstance;
+
+        // Set fullscreen if needed
+        if (fullScreen && unityInstanceRef.current) {
+          unityInstanceRef.current.SetFullscreen(true);
+        }
+      } catch (error) {
+        console.error('Failed to load Unity WebGL:', error);
+      }
+    };
+
+    // Load the Unity loader script
+    const script = document.createElement('script');
+    script.src = unityContent.loaderUrl;
+    script.async = true;
+    script.onload = () => {
+      loadUnity();
+    };
+    document.body.appendChild(script);
+
+    // Cleanup function
+    return () => {
+      if (unityInstanceRef.current) {
+        unityInstanceRef.current.Quit();
+        unityInstanceRef.current = null;
+        window.unityInstance = undefined;
+
+        if (onPlayerUnload) {
+          onPlayerUnload('Unity WebGL player unloaded');
+        }
+      }
+
+      document.body.removeChild(script);
+    };
+  }, [unityContent.loaderUrl, fullScreen, onPlayerUnload]);
+
+  // Expose methods to parent component
+  useImperativeHandle(
+    ref,
+    () => ({
+      postMessage: (
+        gameObject: string,
+        methodName: string,
+        message: string
+      ) => {
+        if (unityInstanceRef.current) {
+          unityInstanceRef.current.SendMessage(
+            gameObject,
+            methodName,
+            message
+          );
+        }
+      },
+      unloadUnity: () => {
+        if (unityInstanceRef.current) {
+          unityInstanceRef.current.Quit();
+          unityInstanceRef.current = null;
+          window.unityInstance = undefined;
+
+          if (onPlayerUnload) {
+            onPlayerUnload('Unity WebGL player unloaded');
+          }
+        }
+      },
+      pauseUnity: (pause: boolean) => {
+        // WebGL builds don't have direct pause/resume, but we can use Time.timeScale
+        if (unityInstanceRef.current) {
+          const timeScale = pause ? 0 : 1;
+          unityInstanceRef.current.SendMessage(
+            'WebGLHandler',
+            'SetTimeScale',
+            timeScale.toString()
+          );
+        }
+      },
+      resumeUnity: () => {
+        if (unityInstanceRef.current) {
+          unityInstanceRef.current.SendMessage(
+            'WebGLHandler',
+            'SetTimeScale',
+            '1'
+          );
+        }
+      }
+    }),
+    [onPlayerUnload]
+  );
+
+  return (
+    <View ref={containerRef} style={[styles.container, style]}>
+      <canvas
+        ref={canvasRef}
+        // @ts-ignore - React Native Web style type mismatch
+        style={{
+          width: '100%',
+          height: '100%'
+        }}
+      />
+    </View>
+  );
+});
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    overflow: 'hidden',
+  }
+});
+
+export default UnityViewWeb;

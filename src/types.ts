@@ -1,4 +1,4 @@
-import { ViewStyle, StyleProp } from 'react-native';
+import type { ViewStyle, StyleProp } from 'react-native';
 import type { DirectEventHandler } from 'react-native/Libraries/Types/CodegenTypes';
 
 /**
@@ -86,7 +86,11 @@ export interface UnityViewProps {
  */
 export interface UnityWebViewRef {
   /** Send a message to Unity */
-  postMessage: (gameObject: string, methodName: string, message: string) => void;
+  postMessage: (
+    gameObject: string,
+    methodName: string,
+    message: string
+  ) => void;
   /** Unload the Unity instance */
   unloadUnity: () => void;
   /** Pause or unpause Unity */
@@ -98,9 +102,18 @@ export interface UnityWebViewRef {
 /**
  * Unity instance methods
  */
-export interface UnityInstance {
+export interface UnityInstance {}
+
+/**
+ * Unity WebGL Builder interface
+ */
+export interface WebGLBuilder {
   /** Send a message to a GameObject in Unity */
-  SendMessage: (gameObject: string, methodName: string, message: string) => void;
+  SendMessage: (
+    gameObject: string,
+    methodName: string,
+    message: string
+  ) => void;
   /** Quit the Unity instance */
   Quit: () => void;
   /** Set fullscreen mode */
