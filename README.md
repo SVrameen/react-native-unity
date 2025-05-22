@@ -7,6 +7,8 @@ Attention! Added support for Unity 2023 and above
 
 > [!IMPORTANT]
 > For iOS, it is no longer necessary to embed a project created with Unity. Only the built `UnityFramework` is used. It should be placed in the plugin folder at the path - `<YOUR_RN_PROJECT>/unity/builds/ios`
+>
+> For Web, place your Unity WebGL build files in the plugin folder at the path - `<YOUR_RN_PROJECT>/unity/builds/web`
 
 ## Device Support:
 
@@ -16,8 +18,14 @@ Attention! Added support for Unity 2023 and above
 | iOS Device       | ✅        |
 | Android Emulator | ✅        |
 | Android Device   | ✅        |
+| Web (WebGL)      | ✅        |
 
 # Installation
+
+> [!NOTE]
+> For information on using the WebGL support for web platforms, see [Web Support Documentation](./docs/WEB_SUPPORT.md)
+>
+> If you're migrating an existing app to support web, check out the [Migration Guide](./docs/MIGRATION_GUIDE.md)
 
 ## Install this package in your react-native project:
 

@@ -40,7 +40,10 @@
     "react-native",
     "ios",
     "android",
-    "unity"
+    "unity",
+    "webgl",
+    "web",
+    "expo"
   ],
   "repository": {
     "type": "git",
